@@ -11,3 +11,6 @@ CREATE TABLE IF NOT EXISTS service_requests (
   latitude DECIMAL(9,6),
   longitude DECIMAL(9,6)
 );
+
+CREATE INDEX idx_created_date ON service_requests(created_date);
+CREATE INDEX idx_borough ON service_requests(borough);

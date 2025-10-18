@@ -1,1 +1,47 @@
-<!-- HTML template placeholder -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>NYC 311 Search</title>
+</head>
+<body>
+<h2>NYC 311 Service Requests</h2>
+
+<form method="get" action="/">
+    Borough: <input type="text" name="borough" value="{{ filters.borough }}">
+    Complaint Type: <input type="text" name="complaint_type" value="{{ filters.complaint_type }}">
+    Start Date: <input type="date" name="start_date" value="{{ filters.start_date }}">
+    End Date: <input type="date" name="end_date" value="{{ filters.end_date }}">
+    <button type="submit">Search</button>
+</form>
+
+<p>{{ total }} results found.</p>
+
+<table border="1" cellpadding="5">
+    <tr>
+        <th>Unique Key</th><th>Date</th><th>Agency</th><th>Complaint</th><th>Borough</th>
+    </tr>
+    {% for r in results %}
+    <tr>
+        <td>{{ r.unique_key }}</td>
+        <td>{{ r.created_date }}</td>
+        <td>{{ r.agency }}</td>
+        <td>{{ r.complaint_type }}</td>
+        <td>{{ r.borough }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<p>
+{% if page > 1 %}
+  <a href="?page={{ page - 1 }}&borough={{ filters.borough }}&complaint_type={{ filters.complaint_type }}&start_date={{ filters.start_date }}&end_date={{ filters.end_date }}">Previous</a>
+{% endif %}
+ Page {{ page }} of {{ pages }}
+{% if page < pages %}
+  <a href="?page={{ page + 1 }}&borough={{ filters.borough }}&complaint_type={{ filters.complaint_type }}&start_date={{ filters.start_date }}&end_date={{ filters.end_date }}">Next</a>
+{% endif %}
+</p>
+
+<p><a href="/aggregate">View Complaints per Borough</a></p>
+</body>
+</html>
+

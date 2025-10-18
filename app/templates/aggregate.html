@@ -1,1 +1,18 @@
-<!-- Aggregate view placeholder -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Complaints per Borough</title>
+</head>
+<body>
+<h2>Complaints per Borough</h2>
+
+<table border="1" cellpadding="5">
+    <tr><th>Borough</th><th>Total Complaints</th></tr>
+    {% for row in data %}
+    <tr><td>{{ row.borough }}</td><td>{{ row.total_complaints }}</td></tr>
+    {% endfor %}
+</table>
+
+<p><a href="/">Back to Search</a></p>
+</body>
+</html>
