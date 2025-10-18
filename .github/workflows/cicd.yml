@@ -26,114 +26,107 @@ jobs:
       - name: Verify Docker Image
         run: docker images nyc311-flask
 
-jobs:
-# ... (build job remains the same) ...
+test:
+  name: Run ETL and Selenium Tests
+  runs-on: ubuntu-latest
+  needs: build
+  services:
+    mysql:
+      image: mysql:8.0
+      ports:
+        - 3306:3306
+      env:
+        MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+        MYSQL_DATABASE: ${{ secrets.MYSQL_DB }}
+        MYSQL_USER: ${{ secrets.MYSQL_USER }}
+        MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+      options: >-
+        --health-cmd="mysqladmin ping --silent"
+        --health-interval=10s
+        --health-timeout=10s
+        --health-retries=30
 
-  test:
-    name: Run ETL and Selenium Tests
-    runs-on: ubuntu-latest
-    needs: build
-    services:
-      mysql:
-        image: mysql:8.0
-        ports:
-          - 3306:3306
-        env:
-          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
-          MYSQL_DATABASE: ${{ secrets.MYSQL_DB }}
-          MYSQL_USER: ${{ secrets.MYSQL_USER }}
-          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
-        options: >-
-          --health-cmd="mysqladmin ping --silent"
-          --health-interval=10s
-          --health-timeout=10s
-          --health-retries=30
+  steps:
+    - uses: actions/checkout@v4
 
-    steps:
-      - uses: actions/checkout@v4
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+         
+    # --- FIX 1: Install Chrome browser, jq, and dependencies for the driver logic ---
+    - name: Install Google Chrome, JQ, and dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y wget unzip jq
+        
+        # Install Google Chrome since it's not a default package
+        wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+        sudo apt install ./google-chrome-stable_current_amd64.deb -y
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+    - name: Install Chrome and ChromeDriver
+      run: |
+          # 1. Get the major version of installed Chrome
+          CHROME_MAJOR_VERSION=$(google-chrome-stable --version | cut -d ' ' -f 3 | cut -d '.' -f 1)
           
-      # --- FIX 1: Install Chrome browser, jq, and dependencies for the driver logic ---
-      - name: Install Google Chrome, JQ, and dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y wget unzip jq
+          # 2. Query the CfT API for the latest *stable* version matching the major version
+          DRIVER_INFO=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json")
           
-          # Install Google Chrome since it's not a default package
-          wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-          sudo apt install ./google-chrome-stable_current_amd64.deb -y
+          # 3. Use 'jq' to extract the correct driver version and URL
+          DRIVER_URL=$(echo "${DRIVER_INFO}" | jq -r ".channels.Stable.downloads.chromedriver[] | select(.platform == \"linux64\") | .url")
 
-      - name: Install Chrome and ChromeDriver
-        run: |
-            # 1. Get the major version of installed Chrome
-            CHROME_MAJOR_VERSION=$(google-chrome-stable --version | cut -d ' ' -f 3 | cut -d '.' -f 1)
+          # The jq command will return the direct download URL for the driver zip.
+          if [ -z "$DRIVER_URL" ]; then
+              echo "Error: Could not find a matching Chromedriver download URL for linux64 stable channel."
+              exit 1
+          fi
             
-            # 2. Query the CfT API for the latest *stable* version matching the major version
-            DRIVER_INFO=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json")
+          DRIVER_ZIP_FILE=$(basename "$DRIVER_URL")
+
+          # 4. Download and unzip the driver
+          curl -sS -O "$DRIVER_URL"
+          unzip -q "$DRIVER_ZIP_FILE"
             
-            # 3. Use 'jq' to extract the correct driver version and URL
-            DRIVER_URL=$(echo "${DRIVER_INFO}" | jq -r ".channels.Stable.downloads.chromedriver[] | select(.platform == \"linux64\") | .url")
-
-            # The jq command will return the direct download URL for the driver zip.
-            if [ -z "$DRIVER_URL" ]; then
-                echo "Error: Could not find a matching Chromedriver download URL for linux64 stable channel."
-                exit 1
-            fi
+          # 5. Move it to a directory in the PATH and make it executable
+          sudo mv chromedriver-linux64/chromedriver /usr/local/bin/
+          sudo chmod +x /usr/local/bin/chromedriver
             
-            DRIVER_ZIP_FILE=$(basename "$DRIVER_URL")
+          echo "Successfully installed Chromedriver version matching Chrome major version $CHROME_MAJOR_VERSION"
 
-            # 4. Download and unzip the driver
-            curl -sS -O "$DRIVER_URL"
-            unzip -q "$DRIVER_ZIP_FILE"
-            
-            # 5. Move it to a directory in the PATH and make it executable
-            sudo mv chromedriver-linux64/chromedriver /usr/local/bin/
-            sudo chmod +x /usr/local/bin/chromedriver
-            
-            echo "Successfully installed Chromedriver version matching Chrome major version $CHROME_MAJOR_VERSION"
+    - name: Wait for MySQL to be ready
+      run: |
+        for i in {1..30}; do
+          # Use the correct host '127.0.0.1' for services running via ports
+          mysqladmin ping -h 127.0.0.1 -uroot -p${{ secrets.MYSQL_ROOT_PASSWORD }} && break
+          echo "Waiting for MySQL to start..."
+          sleep 10
+        done
 
-      - name: Wait for MySQL to be ready
-        run: |
-          for i in {1..30}; do
-            # Use the correct host '127.0.0.1' for services running via ports
-            mysqladmin ping -h 127.0.0.1 -uroot -p${{ secrets.MYSQL_ROOT_PASSWORD }} && break
-            echo "Waiting for MySQL to start..."
-            sleep 10
-          done
+    - name: Dump MySQL Logs (for debugging)
+      if: failure()
+      run: docker logs ${{ job.services.mysql.id }}
 
-      - name: Dump MySQL Logs (for debugging)
-        if: failure()
-        run: docker logs ${{ job.services.mysql.id }}
+    - name: Install dependencies
+      run: pip install -r requirements.txt
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
+    - name: Run ETL on Fixture CSV
+      run: python etl/etl.py
+      env:
+        MYSQL_HOST: 127.0.0.1
+        MYSQL_USER: ${{ secrets.MYSQL_USER }}
+        MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+        MYSQL_DB: ${{ secrets.MYSQL_DB }}
 
-      - name: Run ETL on Fixture CSV
-        run: python etl/etl.py
-        env:
-          MYSQL_HOST: 127.0.0.1
-          MYSQL_USER: ${{ secrets.MYSQL_USER }}
-          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
-          MYSQL_DB: ${{ secrets.MYSQL_DB }}
-
-      # --- FIX 2: Use start-server-and-test to reliably start the app and run tests ---
-      - name: Start Flask App and Run Selenium Tests
-        uses: cypress-io/github-action@v6
-        with:
-          # Command to start the Flask app on the host 0.0.0.0 and port 5000
-          start: flask run --host=0.0.0.0 --port=5000
+    - name: Start Flask App and Run Selenium Tests
+      uses: cypress-io/github-action@v6
+      with:
+        start: flask run --host=0.0.0.0 --port=5000
+        
+        wait-on: http://localhost:5000 
           
-          # URL to wait for before running tests
-          wait-on: http://localhost:5000 
-          
-          # Command to run after the server is ready
-          command: python -m pytest tests/selenium_test.py -v
-        env:
-          MYSQL_HOST: 127.0.0.1
-          MYSQL_USER: ${{ secrets.MYSQL_USER }}
-          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
-          MYSQL_DB: ${{ secrets.MYSQL_DB }}
+        command: python -m pytest tests/selenium_test.py -v
+      env:
+        MYSQL_HOST: 127.0.0.1
+        MYSQL_USER: ${{ secrets.MYSQL_USER }}
+        MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+        MYSQL_DB: ${{ secrets.MYSQL_DB }}
