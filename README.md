@@ -80,7 +80,7 @@ Access it in a browser at `http://localhost:5000`.
 Load the fixture sample CSV into the database:
 
 ```bash
-python etl/etl.py tests/fixture_sample.csv
+python etl/etl.py
 ```
 
 Adapt `etl.py` to point to your CSV file location as needed.
@@ -92,7 +92,7 @@ Adapt `etl.py` to point to your CSV file location as needed.
 Execute Selenium end-to-end tests:
 
 ```bash
-pytest -v tests/selenium_test.py
+python -m pytest tests/selenium_test.py -v
 ```
 
 Ensure Chrome and matching ChromeDriver are installed and compatible.
