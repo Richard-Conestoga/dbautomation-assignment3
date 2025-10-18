@@ -73,7 +73,7 @@ jobs:
         run: docker logs ${{ job.services.mysql.id }}
 
       - name: Run ETL on Fixture CSV
-        run: python app/ingest.py
+        run: python etl/etl.py
         env:
           MYSQL_HOST: 127.0.0.1
           MYSQL_USER: ${{ secrets.MYSQL_USER }}
