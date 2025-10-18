@@ -1,3 +1,4 @@
+psutil
 flask
 pymysql
 pandas
@@ -5,6 +6,5 @@ selenium
 webdriver-manager
 numpy
 dotenv
-psutil
 pytest
 cryptography
