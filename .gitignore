@@ -1,13 +1,9 @@
-# Ignore pytest cache folder
+# Ignore folders
 .pytest_cache/
-
-# Ignore data folder entirely
 data/
 
-# Ignore all Microsoft Word docx files
+# Ignore files
 *.docx
-
-# Ignore sensitive environment variables
 .env
 
 # Do NOT ignore the example environment file
