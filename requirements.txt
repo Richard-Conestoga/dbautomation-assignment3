@@ -1,6 +1,9 @@
-Flask
+flask
 pymysql
-SQLAlchemy
 pandas
 selenium
 webdriver-manager
+numpy
+dotenv
+psutil
+pytest
