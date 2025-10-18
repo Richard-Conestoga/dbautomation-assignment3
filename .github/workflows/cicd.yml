@@ -58,14 +58,13 @@ jobs:
         run: |
             sudo apt-get update
             sudo apt-get install -y wget unzip
-            wget https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_114.0.5735.134-1_amd64.deb
-            sudo dpkg -i google-chrome-stable_114.0.5735.134-1_amd64.deb || sudo apt-get -f install -y
+            wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+            sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list'
+            sudo apt-get update
 
-            CHROMEDRIVER_VERSION=114.0.5735.90
-            wget -N https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip
-            unzip -o chromedriver_linux64.zip
-            sudo mv chromedriver /usr/local/bin/
-            sudo chmod +x /usr/local/bin/chromedriver
+            sudo apt-get install -y google-chrome-stable
+
+            sudo apt-get install -y chromedriver
 
       - name: Wait for MySQL to be ready
         run: |
