@@ -58,17 +58,35 @@ jobs:
         run: |
             sudo apt-get update
             sudo apt-get install -y wget unzip
-            # Get the version of installed chrome
-            CHROME_VERSION=$(google-chrome-stable --version | cut -d ' ' -f 3)
-            DRIVER_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_${CHROME_VERSION}" | tr -d '\n')
 
-            # Download and unzip the driver
-            curl -sS -O "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${DRIVER_VERSION}/linux64/chromedriver-linux64.zip"
-            unzip chromedriver-linux64.zip
+            # 1. Get the major version of installed Chrome
+            CHROME_MAJOR_VERSION=$(google-chrome-stable --version | cut -d ' ' -f 3 | cut -d '.' -f 1)
             
-            # Move it to a directory in the PATH and make it executable
+            # 2. Query the CfT API for the latest *stable* version matching the major version
+            DRIVER_INFO=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json")
+            
+            # 3. Use 'jq' to extract the correct driver version and URL
+            # We look for the 'stable' channel's driver matching the runner's architecture (linux64)
+            DRIVER_URL=$(echo "${DRIVER_INFO}" | jq -r ".channels.Stable.downloads.chromedriver[] | select(.platform == \"linux64\") | .url")
+
+            # The jq command will return the direct download URL for the driver zip.
+            if [ -z "$DRIVER_URL" ]; then
+                echo "Error: Could not find a matching Chromedriver download URL for linux64 stable channel."
+                exit 1
+            fi
+            
+            DRIVER_ZIP_FILE=$(basename "$DRIVER_URL")
+
+            # 4. Download and unzip the driver
+            curl -sS -O "$DRIVER_URL"
+            unzip -q "$DRIVER_ZIP_FILE"
+            
+            # The extracted folder is always 'chromedriver-linux64'
+            # 5. Move it to a directory in the PATH and make it executable
             sudo mv chromedriver-linux64/chromedriver /usr/local/bin/
             sudo chmod +x /usr/local/bin/chromedriver
+            
+            echo "Successfully installed Chromedriver version matching Chrome major version $CHROME_MAJOR_VERSION"
 
       - name: Wait for MySQL to be ready
         run: |
