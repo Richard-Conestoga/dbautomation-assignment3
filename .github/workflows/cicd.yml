@@ -91,7 +91,7 @@ jobs:
           MYSQL_DB: ${{ secrets.MYSQL_DB }}
 
       - name: Run Selenium Tests
-        run: pytest -q tests/selenium_test.py
+        run: python -m pytest tests/selenium_test.py -v
         env:
           MYSQL_HOST: 127.0.0.1
           MYSQL_USER: ${{ secrets.MYSQL_USER }}
