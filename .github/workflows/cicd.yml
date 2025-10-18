@@ -65,7 +65,7 @@ jobs:
           for i in {1..30}; do
             mysqladmin ping -h 127.0.0.1 -uroot -p${{ secrets.MYSQL_ROOT_PASSWORD }} && break
             echo "Waiting for MySQL..."
-            sleep 2
+            sleep 10
           done
 
       - name: Run ETL on Fixture CSV
@@ -79,7 +79,7 @@ jobs:
       - name: Start Flask App (background)
         run: |
           flask run --host=0.0.0.0 --port=5000 &
-          sleep 5
+          sleep 10
         env:
           MYSQL_HOST: 127.0.0.1
           MYSQL_USER: ${{ secrets.MYSQL_USER }}
